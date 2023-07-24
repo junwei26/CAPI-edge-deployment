@@ -1,0 +1,293 @@
+apiVersion: v1
+binaryData:
+  ca.crt: ""
+kind: ConfigMap
+metadata:
+  name: user-ca-bundle
+  namespace: {{ .Values.namespace }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Values.nke_cluster_name }}
+  namespace: {{ .Values.namespace }}
+stringData:
+  credentials: "[\n  {\n    \"type\": \"basic_auth\", \n    \"data\": { \n      \"prismCentral\":{\n
+    \       \"username\": \"{{ .Values.user }}\", \n        \"password\": \"{{ .Values.password }}\"\n
+    \     }\n    }\n  }\n]\n"
+---
+apiVersion: bootstrap.cluster.x-k8s.io/v1beta1
+kind: KubeadmConfigTemplate
+metadata:
+  name: {{ .Values.nke_cluster_name }}-kcfg-0
+  namespace: {{ .Values.namespace }}
+spec:
+  template:
+    spec:
+      joinConfiguration:
+        nodeRegistration:
+          kubeletExtraArgs:
+            eviction-hard: nodefs.available<10%,nodefs.inodesFree<5%,imagefs.available<15%,memory.available<100Mi,imagefs.inodesFree<10%
+            tls-cipher-suites: TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256
+      postKubeadmCommands:
+      - echo "after kubeadm call" > /var/log/postkubeadm.log
+      preKubeadmCommands:
+      - echo "before kubeadm call" > /var/log/prekubeadm.log
+      - hostnamectl set-hostname {{ "\"{{ ds.meta_data.hostname }}\"" }}
+      users:
+      - lockPassword: false
+        name: capiuser
+        sshAuthorizedKeys:
+        - {{ .Values.ssh_pub_key }}
+        sudo: ALL=(ALL) NOPASSWD:ALL
+      verbosity: 10
+---
+apiVersion: cluster.x-k8s.io/v1beta1
+kind: Cluster
+metadata:
+  labels:
+    cluster.x-k8s.io/cluster-name: {{ .Values.nke_cluster_name }}
+  name: {{ .Values.nke_cluster_name }}
+  namespace: {{ .Values.namespace }}
+spec:
+  clusterNetwork:
+    pods:
+      cidrBlocks:
+      - 172.20.0.0/16
+    serviceDomain: cluster.local
+    services:
+      cidrBlocks:
+      - 172.19.0.0/16
+  controlPlaneRef:
+    apiVersion: controlplane.cluster.x-k8s.io/v1beta1
+    kind: KubeadmControlPlane
+    name: {{ .Values.nke_cluster_name }}-kcp
+  infrastructureRef:
+    apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+    kind: NutanixCluster
+    name: {{ .Values.nke_cluster_name }}
+---
+apiVersion: cluster.x-k8s.io/v1beta1
+kind: MachineDeployment
+metadata:
+  labels:
+    cluster.x-k8s.io/cluster-name: {{ .Values.nke_cluster_name }}
+  name: {{ .Values.nke_cluster_name }}-wmd
+  namespace: {{ .Values.namespace }}
+spec:
+  clusterName: {{ .Values.nke_cluster_name }}
+  replicas: 3
+  selector:
+    matchLabels: {}
+  template:
+    metadata:
+      labels:
+        cluster.x-k8s.io/cluster-name: {{ .Values.nke_cluster_name }}
+    spec:
+      bootstrap:
+        configRef:
+          apiVersion: bootstrap.cluster.x-k8s.io/v1beta1
+          kind: KubeadmConfigTemplate
+          name: {{ .Values.nke_cluster_name }}-kcfg-0
+      clusterName: {{ .Values.nke_cluster_name }}
+      infrastructureRef:
+        apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+        kind: NutanixMachineTemplate
+        name: {{ .Values.nke_cluster_name }}-mt-0
+      version: {{ .Values.k8s_version }}
+---
+apiVersion: cluster.x-k8s.io/v1beta1
+kind: MachineHealthCheck
+metadata:
+  name: {{ .Values.nke_cluster_name }}-mhc
+  namespace: {{ .Values.namespace }}
+spec:
+  clusterName: {{ .Values.nke_cluster_name }}
+  maxUnhealthy: 40%
+  nodeStartupTimeout: 10m0s
+  selector:
+    matchLabels:
+      cluster.x-k8s.io/cluster-name: {{ .Values.nke_cluster_name }}
+  unhealthyConditions:
+  - status: "False"
+    timeout: 5m0s
+    type: Ready
+  - status: Unknown
+    timeout: 5m0s
+    type: Ready
+  - status: "True"
+    timeout: 5m0s
+    type: MemoryPressure
+  - status: "True"
+    timeout: 5m0s
+    type: DiskPressure
+  - status: "True"
+    timeout: 5m0s
+    type: PIDPressure
+  - status: "True"
+    timeout: 5m0s
+    type: NetworkUnavailable
+---
+apiVersion: controlplane.cluster.x-k8s.io/v1beta1
+kind: KubeadmControlPlane
+metadata:
+  name: {{ .Values.nke_cluster_name }}-kcp
+  namespace: {{ .Values.namespace }}
+spec:
+  kubeadmConfigSpec:
+    clusterConfiguration:
+      apiServer:
+        certSANs:
+        - localhost
+        - 127.0.0.1
+        - 0.0.0.0
+        extraArgs:
+          tls-cipher-suites: TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256
+      controllerManager:
+        extraArgs:
+          enable-hostpath-provisioner: "true"
+          tls-cipher-suites: TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256
+      scheduler:
+        extraArgs:
+          tls-cipher-suites: TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256
+    files:
+    - content: |
+        apiVersion: v1
+        kind: Pod
+        metadata:
+          name: kube-vip
+          namespace: kube-system
+        spec:
+          containers:
+            - name: kube-vip
+              image: ghcr.io/kube-vip/kube-vip:v0.6.0
+              imagePullPolicy: IfNotPresent
+              args:
+                - manager
+              env:
+                - name: vip_arp
+                  value: "true"
+                - name: address
+                  value: "{{ .Values.control_plane_endpoint }}"
+                - name: port
+                  value: "6443"
+                - name: vip_cidr
+                  value: "32"
+                - name: cp_enable
+                  value: "true"
+                - name: cp_namespace
+                  value: kube-system
+                - name: vip_ddns
+                  value: "false"
+                - name: vip_leaderelection
+                  value: "true"
+                - name: vip_leaseduration
+                  value: "15"
+                - name: vip_renewdeadline
+                  value: "10"
+                - name: vip_retryperiod
+                  value: "2"
+                - name: svc_enable
+                  value: "false"
+                - name: lb_enable
+                  value: "false"
+                - name: enableServicesElection
+                  value: "false"
+              securityContext:
+                capabilities:
+                  add:
+                    - NET_ADMIN
+                    - SYS_TIME
+                    - NET_RAW
+              volumeMounts:
+                - mountPath: /etc/kubernetes/admin.conf
+                  name: kubeconfig
+              resources: {}
+          hostNetwork: true
+          hostAliases:
+            - hostnames:
+                - kubernetes
+              ip: 127.0.0.1
+          volumes:
+            - name: kubeconfig
+              hostPath:
+                type: FileOrCreate
+                path: /etc/kubernetes/admin.conf
+        status: {}
+      owner: root:root
+      path: /etc/kubernetes/manifests/kube-vip.yaml
+    initConfiguration:
+      nodeRegistration:
+        kubeletExtraArgs:
+          eviction-hard: nodefs.available<10%,nodefs.inodesFree<5%,imagefs.available<15%,memory.available<100Mi,imagefs.inodesFree<10%
+          tls-cipher-suites: TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256
+    joinConfiguration:
+      nodeRegistration:
+        kubeletExtraArgs:
+          eviction-hard: nodefs.available<10%,nodefs.inodesFree<5%,imagefs.available<15%,memory.available<100Mi,imagefs.inodesFree<10%
+          tls-cipher-suites: TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256
+    postKubeadmCommands:
+    - echo export KUBECONFIG=/etc/kubernetes/admin.conf >> /root/.bashrc
+    - echo "after kubeadm call" > /var/log/postkubeadm.log
+    preKubeadmCommands:
+    - echo "before kubeadm call" > /var/log/prekubeadm.log
+    - hostnamectl set-hostname {{ "\"{{ ds.meta_data.hostname }}\"" }}
+    useExperimentalRetryJoin: true
+    users:
+    - lockPassword: false
+      name: capiuser
+      sshAuthorizedKeys:
+      - {{ .Values.ssh_pub_key }}
+      sudo: ALL=(ALL) NOPASSWD:ALL
+    verbosity: 10
+  machineTemplate:
+    infrastructureRef:
+      apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+      kind: NutanixMachineTemplate
+      name: {{ .Values.nke_cluster_name }}-mt-0
+  replicas: 1
+  version: {{ .Values.k8s_version }}
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+kind: NutanixCluster
+metadata:
+  name: {{ .Values.nke_cluster_name }}
+  namespace: {{ .Values.namespace }}
+spec:
+  controlPlaneEndpoint:
+    host: {{ .Values.control_plane_endpoint }}
+    port: 6443
+  prismCentral:
+    additionalTrustBundle:
+      kind: ConfigMap
+      name: user-ca-bundle
+    address: {{ .Values.prism_central_ip }}
+    credentialRef:
+      kind: Secret
+      name: {{ .Values.nke_cluster_name }}
+    insecure: true
+    port: 9440
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+kind: NutanixMachineTemplate
+metadata:
+  name: {{ .Values.nke_cluster_name }}-mt-0
+  namespace: {{ .Values.namespace }}
+spec:
+  template:
+    spec:
+      bootType: legacy
+      cluster:
+        name: {{ .Values.cluster_name }}
+        type: name
+      image:
+        name: {{ .Values.machine_image_name }}
+        type: name
+      memorySize: 4Gi
+      providerID: nutanix://{{ .Values.nke_cluster_name }}-m1
+      subnet:
+      - name: {{ .Values.subnet_name }}
+        type: name
+      systemDiskSize: 40Gi
+      vcpuSockets: 2
+      vcpusPerSocket: 1
