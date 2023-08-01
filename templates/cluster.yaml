@@ -93,7 +93,7 @@ spec:
       infrastructureRef:
         apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
         kind: NutanixMachineTemplate
-        name: {{ .Values.nke_cluster_name }}-mt-0
+        name: {{ .Values.nke_cluster_name }}-mt-wmd
       version: {{ .Values.k8s_version }}
 ---
 apiVersion: cluster.x-k8s.io/v1beta1
@@ -244,7 +244,7 @@ spec:
     infrastructureRef:
       apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
       kind: NutanixMachineTemplate
-      name: {{ .Values.nke_cluster_name }}-mt-0
+      name: {{ .Values.nke_cluster_name }}-mt-kcp
   replicas: 1
   version: {{ .Values.k8s_version }}
 ---
@@ -271,7 +271,36 @@ spec:
 apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
 kind: NutanixMachineTemplate
 metadata:
-  name: {{ .Values.nke_cluster_name }}-mt-0
+  name: {{ .Values.nke_cluster_name }}-mt-kcp
+  namespace: {{ .Values.namespace }}
+spec:
+  template:
+    spec:
+      bootType: legacy
+      cluster:
+        name: {{ .Values.cluster_name }}
+        type: name
+      image:
+        name: {{ .Values.machine_image_name }}
+        type: name
+      memorySize: 4Gi
+      providerID: nutanix://{{ .Values.nke_cluster_name }}-m1
+      subnet:
+      - name: {{ .Values.subnet_name }}
+        type: name
+      additionalCategories:
+        - key: AppType
+          value: Kubernetes
+        - key: Environment
+          value: Prod
+      systemDiskSize: 40Gi
+      vcpuSockets: 2
+      vcpusPerSocket: 1
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+kind: NutanixMachineTemplate
+metadata:
+  name: {{ .Values.nke_cluster_name }}-mt-wmd
   namespace: {{ .Values.namespace }}
 spec:
   template:
