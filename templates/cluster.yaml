@@ -288,6 +288,11 @@ spec:
       subnet:
       - name: {{ .Values.subnet_name }}
         type: name
+      additionalCategories:
+	- key: AppType
+	  value: Kubernetes
+	- key: Environment
+	  value: Testing
       systemDiskSize: 40Gi
       vcpuSockets: 2
       vcpusPerSocket: 1
