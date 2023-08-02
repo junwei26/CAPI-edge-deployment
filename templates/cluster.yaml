@@ -291,7 +291,7 @@ spec:
       additionalCategories:
         - key: AppType
           value: Kubernetes
-        - key: KubernetesNode
+        - key: AppTier
           value: ControlPlane
       systemDiskSize: 40Gi
       vcpuSockets: 2
@@ -320,7 +320,7 @@ spec:
       additionalCategories:
         - key: AppType
           value: Kubernetes
-        - key: KubernetesNode
+        - key: AppTier
           value: Worker
       systemDiskSize: 40Gi
       vcpuSockets: 2
