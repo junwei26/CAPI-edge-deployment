@@ -1,0 +1,15 @@
+# Default values for CAPI-edge.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+cluster_name: jetson
+namespace: TO_OVERRIDE
+nke_cluster_name: TO_OVERRIDE
+user: TO_OVERRIDE
+password: TO_OVERRIDE
+prism_central_ip: 10.48.37.10
+machine_image_name: ubuntu-2204-kube-v1.25.10.qcow2
+subnet_name: phx-routed-vlan54-ipam
+control_plane_endpoint: TO_OVERRIDE
+k8s_version: v1.25.6
+ssh_pub_key: TO_OVERRIDE
