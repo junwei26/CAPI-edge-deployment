@@ -26,7 +26,7 @@ spec:
 
           filter_params {
             name   = "KubernetesClusterName"
-            values = [{{ .Values.nke_cluster_name }}]
+            values = ["{{ .Values.nke_cluster_name }}"]
           }
 
           protocol = "TCP"
@@ -69,7 +69,7 @@ spec:
         }
         app_rule_target_group_filter_params {
           name   = "KubernetesClusterName"
-          values = [{{ .Values.nke_cluster_name }}]
+          values = ["{{ .Values.nke_cluster_name }}"]
         }
 
         # Allow all outgoing

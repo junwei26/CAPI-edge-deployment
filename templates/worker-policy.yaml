@@ -25,7 +25,7 @@ spec:
 
           filter_params {
             name   = "KubernetesClusterName"
-            values = [{{ .Values.nke_cluster_name }}]
+            values = ["{{ .Values.nke_cluster_name }}"]
           }
 
           protocol = "TCP"
@@ -67,7 +67,7 @@ spec:
 
         app_rule_target_group_filter_params {
           name   = "KubernetesClusterName"
-          values = [{{ .Values.nke_cluster_name }}]
+          values = ["{{ .Values.nke_cluster_name }}"]
         }
 
         app_rule_outbound_allow_list {
@@ -78,4 +78,4 @@ spec:
     namespace: default
     name: connection-nutanix-flow-jetson
   providerConfigRef:
-    name: nutanix-providerconfig
+    name: {{ .Values.cluster_name }}-providerconfig
