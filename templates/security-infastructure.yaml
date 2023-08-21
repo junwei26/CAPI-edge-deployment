@@ -1,0 +1,61 @@
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: provider-terraform
+spec:
+  package: xpkg.upbound.io/upbound/provider-terraform:v0.10.0
+---
+apiVersion: tf.upbound.io/v1beta1
+kind: ProviderConfig
+metadata:
+  name: {{ .Values.cluster_name }}-providerconfig
+  namespace: default
+spec:
+  configuration: |
+    provider "nutanix" {
+      username     = "{{ .Values.user }}"
+      password     = "{{ .Values.password }}"
+      endpoint     = "{{ .Values.prism_central_ip }}"
+      insecure     = true
+      wait_timeout = 60
+    }
+    terraform {
+      required_providers {
+        nutanix = {
+          source  = "nutanix/nutanix"
+        }
+      }
+      backend "kubernetes" {
+        secret_suffix     = "terraform"
+        namespace         = "default"
+        in_cluster_config = true
+      }
+    }
+---
+apiVersion: tf.upbound.io/v1beta1
+kind: Workspace
+metadata:
+  name:  jetson-flow
+  namespace: default
+spec:
+  forProvider:
+    source: Inline
+    module: |
+      data "nutanix_cluster" "cluster" {
+        name = "{{ .Values.cluster_name }}"
+      }
+      data "nutanix_subnet" "subnet" {
+        subnet_name = "{{ .Values.subnet_name }}"
+      }
+      resource "nutanix_category_key" "KubernetesClusterName" {
+        name        = "KubernetesClusterName"
+      }
+      resource "nutanix_category_value" "try" {
+        name        = "KubernetesClusterName"
+        value       = {{ .Values.nke_cluster_name }}
+      }
+  writeConnectionSecretToRef:
+    namespace: default
+    name: connection-nutanix-flow-jetson
+  providerConfigRef:
+    name: {{ .Values.cluster_name }}-providerconfig
