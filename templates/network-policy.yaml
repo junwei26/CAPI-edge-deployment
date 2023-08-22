@@ -2,7 +2,7 @@ apiVersion: tf.upbound.io/v1beta1
 kind: Workspace
 metadata:
   name:  network-policy
-  namespace: default
+  namespace: {{ .Values.namespace }}
 spec:
   forProvider:
     source: Inline
@@ -153,7 +153,8 @@ spec:
         }
       }
   writeConnectionSecretToRef:
-    namespace: default
+    namespace: {{ .Values.namespace }}
     name: connection-nutanix-flow-jetson
   providerConfigRef:
     name: {{ .Values.cluster_name }}-providerconfig
+    namespace: {{ .Values.namespace }}
