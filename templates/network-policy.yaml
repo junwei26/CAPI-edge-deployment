@@ -1,32 +1,4 @@
 apiVersion: tf.upbound.io/v1beta1
-kind: ProviderConfig
-metadata:
-  name: {{ .Values.cluster_name }}-providerconfig
-  namespace: default
-spec:
-  configuration: |
-    terraform {
-      required_providers {
-        nutanix = {
-          source  = "nutanix/nutanix"
-        }
-      }
-      backend "kubernetes" {
-        secret_suffix     = "terraform"
-        namespace         = "default"
-        in_cluster_config = true
-      }
-    }
-
-    provider "nutanix" {
-      username     = "{{ .Values.user }}"
-      password     = "{{ .Values.password }}"
-      endpoint     = "{{ .Values.prism_central_ip }}"
-      insecure     = true
-      wait_timeout = 60
-    }
----
-apiVersion: tf.upbound.io/v1beta1
 kind: Workspace
 metadata:
   name:  network-policy
