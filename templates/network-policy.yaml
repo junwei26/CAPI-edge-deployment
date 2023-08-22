@@ -1,0 +1,194 @@
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
+metadata:
+  name: terraform-provider
+spec:
+  package: xpkg.upbound.io/upbound/provider-terraform:v0.10.0
+---
+apiVersion: tf.upbound.io/v1beta1
+kind: ProviderConfig
+metadata:
+  name: {{ .Values.cluster_name }}-providerconfig
+  namespace: default
+spec:
+  configuration: |
+    terraform {
+      required_providers {
+        nutanix = {
+          source  = "nutanix/nutanix"
+        }
+      }
+      backend "kubernetes" {
+        secret_suffix     = "terraform"
+        namespace         = "default"
+        in_cluster_config = true
+      }
+    }
+
+    provider "nutanix" {
+      username     = "{{ .Values.user }}"
+      password     = "{{ .Values.password }}"
+      endpoint     = "{{ .Values.prism_central_ip }}"
+      insecure     = true
+      wait_timeout = 60
+    }
+---
+apiVersion: tf.upbound.io/v1beta1
+kind: Workspace
+metadata:
+  name:  network-policy
+  namespace: default
+spec:
+  forProvider:
+    source: Inline
+    module: |
+      data "nutanix_cluster" "cluster" {
+        name = "{{ .Values.cluster_name }}"
+      }
+      data "nutanix_subnet" "subnet" {
+        subnet_name = "{{ .Values.subnet_name }}"
+      }
+
+      resource "nutanix_network_security_rule" "control_plane_rule" {
+        name        = "{{ .Values.nke_cluster_name }}-kcp"
+        description = "Network security rule for Control Plane"
+
+        app_rule_action = "APPLY"
+
+        app_rule_inbound_allow_list {
+          # Way to identify the object for which rule is applied
+          peer_specification_type = "FILTER"
+          filter_type             = "CATEGORIES_MATCH_ALL"
+          filter_kind_list        = ["vm"]
+
+          filter_params {
+            name   = "AppTier"
+            values = ["Worker"]
+          }
+
+          filter_params {
+            name   = "KubernetesClusterName"
+            values = ["{{ .Values.nke_cluster_name }}"]
+          }
+
+          protocol = "TCP"
+          tcp_port_range_list {
+            end_port = 4240
+            start_port = 4240
+          }
+        }
+
+        app_rule_inbound_allow_list {
+          ip_subnet               = "0.0.0.0"
+          ip_subnet_prefix_length = "0"
+          peer_specification_type = "IP_SUBNET"
+          protocol                = "TCP"
+          tcp_port_range_list {
+            end_port   = 6443
+            start_port = 6443
+          }
+
+          tcp_port_range_list {
+            end_port   = 2379
+            start_port = 2379
+          }
+        }
+
+        # By default one control plane cannot talk to another
+        app_rule_target_group_default_internal_policy = "DENY_ALL"
+        
+        # Find all that matches the all the specifications below
+        app_rule_target_group_filter_type = "CATEGORIES_MATCH_ALL"
+        app_rule_target_group_peer_specification_type = "FILTER"
+        app_rule_target_group_filter_kind_list = ["vm"]
+        app_rule_target_group_filter_params {
+          name   = "AppTier"
+          values = ["ControlPlane"]
+        }
+        app_rule_target_group_filter_params {
+          name   = "AppType"
+          values = ["Kubernetes"]
+        }
+        app_rule_target_group_filter_params {
+          name   = "KubernetesClusterName"
+          values = ["{{ .Values.nke_cluster_name }}"]
+        }
+
+        # Allow all outgoing
+        app_rule_outbound_allow_list {
+          peer_specification_type = "ALL"
+        }
+      }
+
+      resource "nutanix_network_security_rule" "worker_rule" {
+        name        = "{{ .Values.nke_cluster_name }}-wmd"
+        description = "Network security rule for Worker nodes"
+
+        app_rule_action = "APPLY"
+
+        app_rule_inbound_allow_list {
+          peer_specification_type = "FILTER"
+          filter_type             = "CATEGORIES_MATCH_ALL"
+          filter_kind_list        = ["vm"]
+
+          filter_params {
+            name   = "AppTier"
+            values = ["ControlPlane"]
+          }
+
+          filter_params {
+            name   = "KubernetesClusterName"
+            values = ["{{ .Values.nke_cluster_name }}"]
+          }
+
+          protocol = "TCP"
+          tcp_port_range_list {
+            end_port = 4240
+            start_port = 4240
+          }
+        }
+
+        app_rule_inbound_allow_list {
+          ip_subnet               = "0.0.0.0"
+          ip_subnet_prefix_length = "0"
+          peer_specification_type = "IP_SUBNET"
+          protocol                = "TCP"
+          tcp_port_range_list {
+            end_port   = 80
+            start_port = 80
+          }
+          tcp_port_range_list {
+            end_port   = 443
+            start_port = 443
+          }
+        }
+
+        app_rule_target_group_default_internal_policy = "ALLOW_ALL"
+        app_rule_target_group_peer_specification_type = "FILTER"
+        app_rule_target_group_filter_type = "CATEGORIES_MATCH_ALL"
+        app_rule_target_group_filter_kind_list = ["vm"]
+
+        app_rule_target_group_filter_params {
+          name   = "AppTier"
+            values = ["Worker"]
+        }
+        
+        app_rule_target_group_filter_params {
+          name   = "AppType"
+          values = ["Kubernetes"]
+        }
+
+        app_rule_target_group_filter_params {
+          name   = "KubernetesClusterName"
+          values = ["{{ .Values.nke_cluster_name }}"]
+        }
+
+        app_rule_outbound_allow_list {
+          peer_specification_type = "ALL"
+        }
+      }
+  writeConnectionSecretToRef:
+    namespace: default
+    name: connection-nutanix-flow-jetson
+  providerConfigRef:
+    name: {{ .Values.cluster_name }}-providerconfig
