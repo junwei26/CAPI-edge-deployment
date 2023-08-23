@@ -17,7 +17,7 @@ flowchart LR
     subgraph Nutanix Cloud
         subgraph Flow
             subgraph New_Kubernetes_Cluster
-                D(new VMs)
+                D[new VMs]
                 Cilium
             end
             B
