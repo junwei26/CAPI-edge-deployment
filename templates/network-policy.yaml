@@ -7,13 +7,6 @@ spec:
   forProvider:
     source: Inline
     module: |
-      data "nutanix_cluster" "cluster" {
-        name = "{{ .Values.cluster_name }}"
-      }
-      data "nutanix_subnet" "subnet" {
-        subnet_name = "{{ .Values.subnet_name }}"
-      }
-
       resource "nutanix_category_value" "try" {
         name        = "KubernetesClusterName"
         value       = {{ .Values.nke_cluster_name }}
