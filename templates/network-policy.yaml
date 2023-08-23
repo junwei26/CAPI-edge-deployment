@@ -14,6 +14,11 @@ spec:
         subnet_name = "{{ .Values.subnet_name }}"
       }
 
+      resource "nutanix_category_value" "try" {
+        name        = "KubernetesClusterName"
+        value       = {{ .Values.nke_cluster_name }}
+      }
+
       resource "nutanix_network_security_rule" "control_plane_rule" {
         name        = "{{ .Values.nke_cluster_name }}-kcp"
         description = "Network security rule for Control Plane"

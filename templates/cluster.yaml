@@ -293,6 +293,8 @@ spec:
           value: Kubernetes
         - key: AppTier
           value: ControlPlane
+        - key: KubernetesClusterName
+          value: {{ .Values.nke_cluster_name }}
       systemDiskSize: 40Gi
       vcpuSockets: 2
       vcpusPerSocket: 1
@@ -322,6 +324,8 @@ spec:
           value: Kubernetes
         - key: AppTier
           value: Worker
+        - key: KubernetesClusterName
+          value: {{ .Values.nke_cluster_name }}
       systemDiskSize: 40Gi
       vcpuSockets: 2
       vcpusPerSocket: 1
