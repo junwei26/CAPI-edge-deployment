@@ -7,7 +7,7 @@ spec:
   forProvider:
     source: Inline
     module: |
-      resource "nutanix_category_value" "try" {
+      resource "nutanix_category_value" "create_category" {
         name        = "KubernetesClusterName"
         value       = "{{ .Values.nke_cluster_name }}"
       }
@@ -108,6 +108,11 @@ spec:
           tcp_port_range_list {
             end_port = 4240
             start_port = 4240
+          }
+
+          tcp_port_range_list {
+            end_port = 10250
+            start_port = 10250
           }
         }
 
